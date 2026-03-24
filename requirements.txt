@@ -1,0 +1,9 @@
+sympy
+numpy
+scipy
+matplotlib
+pandas
+control
+plotly
+slycot
+math
