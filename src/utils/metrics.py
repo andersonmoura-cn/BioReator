@@ -21,6 +21,9 @@ def metrics(noLinear, absol, tempo, label:str):
     # erro maximo
     erro_max = np.max(erro_abs)
 
+    # rmse
+    rmse = np.sqrt(np.mean((noLinear - absol)**2))
+
     # validade da linearizacao
     limite = .05
     idx_validos = np.where(erro_rel <= limite)[0]
@@ -33,4 +36,5 @@ def metrics(noLinear, absol, tempo, label:str):
     print(f"Norma relativa do erro em {label}: {norma_rel*100:.2f}%")
     print(f"Erro máximo em {label}: {trunc(erro_max, 5)}")
     print(f"Validade em {label} até: {math.ceil(t_valido)} h")
+    print(f"RMSE {label}: {rmse:.3f}") 
     

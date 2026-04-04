@@ -13,10 +13,11 @@ from utils.saveFig import img_save
 
 def params(G:TransferFunction, label, A):
     # Cálculo da resposta ao degrau unitário
-    t = np.linspace(0, 20, 1000)
+    t = np.linspace(0, 50, 1000)
     # Degrau de amplitude pequena como entrada
     # A = -0.1*0.35
-    u = np.ones_like(t) * A  # degrau de amplitude A
+    # u = [A if tempo<=20 else -A for tempo in t] # degrau de amplitude A
+    u = np.ones_like(t) * A 
 
     # Simulação  com lsim
     t, y, _ = lsim(G, U=u, T=t)
@@ -98,12 +99,13 @@ def params(G:TransferFunction, label, A):
 
 
     # Configurações do gráfico
-    plt.title(r'Resposta sem uma pertubação', fontsize=16)
+    plt.title(r'Resposta com uma pequena pertubação', fontsize=16)
     plt.xlabel('Tempo (ms)', fontsize=12)
     plt.ylabel('Amplitude de Saída', fontsize=12)
     plt.grid(True, which='both', linestyle='--', linewidth=0.5)
     plt.legend(fontsize=10)
     plt.tight_layout()
+    # plt.ylim(-c_max * 1.1, c_max * 1.1)
     plt.ylim(0, c_max * 1.1)
 
     # Mostra o gráfico na tela
@@ -115,7 +117,7 @@ def params(G:TransferFunction, label, A):
 numerador = G_X_D["num"]
 denominador = G_X_D["den"]
 G = TransferFunction(numerador, denominador)
-params(TransferFunction(G_X_D["num"], G_X_D["den"]), label="G_X_D", A = -0.1*0.35)
+# params(TransferFunction(G_X_D["num"], G_X_D["den"]), label="G_X_D", A = 0.1*0.35)
 params(TransferFunction(G_X_Sf["num"], G_X_Sf["den"]), label="G_X_Sf", A = 0.1*0.35)
 params(TransferFunction(G_S_D["num"], G_S_D["den"]), label="G_S_D", A = 0.1*1)
 params(TransferFunction(G_S_Sf["num"], G_S_Sf["den"]), label="G_S_Sf", A = 0.1*1)
