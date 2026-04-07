@@ -10,7 +10,7 @@ from utils.saveFig import img_save
 # numerador = [K, -K * 180e3]
 # denominador = [1, 3125, 2.25e8]
 
-def gerar_entrada(tipo="degrau", A=1.0, t_final=50, n=1000, t_troca=20):
+def gerar_entrada(tipo="degrau", A=1.0, t_final=24, n=3000, t_troca=20): 
     t = np.linspace(0, t_final, n)
 
     if tipo == "degrau":
@@ -26,6 +26,10 @@ def gerar_entrada(tipo="degrau", A=1.0, t_final=50, n=1000, t_troca=20):
         raise ValueError(f"Tipo de entrada inválido: {tipo}")
 
     return t, u
+
+def is_monotonic(y):
+    dy = np.diff(y)
+    return np.all(dy >= 0) or np.all(dy <= 0)
 
 def params(G: TransferFunction, label, t, u):
 
@@ -57,14 +61,31 @@ def params(G: TransferFunction, label, t, u):
         overshoot_percent = 0
 
     # 3. Tempo de subida (Tr) - tempo para ir de 10% a 90% do valor final
-    try:
-        idx_10_percent = np.where(y >= 0.1 * c_final)[0][0]
-        idx_90_percent = np.where(y >= 0.9 * c_final)[0][0]
-        t_10 = t[idx_10_percent]
-        t_90 = t[idx_90_percent]
-        t_rise = t_90 - t_10
-    except IndexError:
-        t_rise = "Não foi possível calcular"
+    if is_monotonic(y):
+        try:
+            # isso vai dar errado porque não começo porque 0.1*c_final < c_inicial, logo Tr é 0 falsamente
+            # idx_10_percent = np.where(y >= 0.1 * c_final)[0][0]
+            # idx_90_percent = np.where(y >= 0.9 * c_final)[0][0]
+
+            y0 = y[0]
+            yf = y[-1]
+            delta = yf - y0
+
+            y_10 = y0 + 0.1 * delta
+            y_90 = y0 + 0.9 * delta
+
+            idx_10_percent = np.where(y >= y_10)[0][0]
+            idx_90_percent = np.where(y >= y_90)[0][0]
+
+            t_10 = t[idx_10_percent]
+            t_90 = t[idx_90_percent]
+            t_rise = t_90 - t_10
+        except IndexError:
+            t_rise = "Não foi possível calcular"
+            t_10 = None
+            t_90 = None
+    else:
+        t_rise = None
         t_10 = None
         t_90 = None
 
@@ -87,12 +108,12 @@ def params(G: TransferFunction, label, t, u):
     print(f"Valor de Pico (c_max): {c_max}")
     print(f"Percentual de Overshoot (%OS): {overshoot_percent}")
     if isinstance(t_rise, float):
-        print(f"Tempo de Subida (10%-90%) em segundos: {t_rise}")
+        print(f"Tempo de Subida (10%-90%): {t_rise} h")
     else:
         print(f"Tempo de Subida (10%-90%): {t_rise}")
 
     if isinstance(t_settling, float):
-        print(f"Tempo de Estabilização (critério 2%) em segundos: {t_settling}")
+        print(f"Tempo de Estabilização (critério 2%): {t_settling} h")
     else:
         print(f"Tempo de Estabilização (critério 2%): {t_settling}")
     print("-" * 50)
@@ -100,7 +121,8 @@ def params(G: TransferFunction, label, t, u):
 
     # --- Geração do Gráfico ---
     plt.figure(figsize=(12, 7))
-    plt.plot(t * 1000, y, label='Resposta ao Degrau', linewidth=2) # Eixo x em ms
+    # t_plot = t * 60  # horas -> minutos
+    plt.plot(t, y, label='Resposta ao Degrau', linewidth=2) # Eixo x em min
 
     # Linhas de referência e anotações
     plt.axhline(c_final, color='red', linestyle='--', label=f'Valor Estacionário ({c_final:.3f})')
@@ -110,19 +132,20 @@ def params(G: TransferFunction, label, t, u):
 
     # Anotações para tempo de estabilização
     if isinstance(t_settling, float):
-        plt.axvline(t_settling * 1000, color='purple', linestyle='--', label=f'Tempo de Estabilização ({t_settling*1000:.2f} ms)')
+        plt.axvline(t_settling  , color='purple', linestyle='--', label=f'Tempo de Estabilização ({t_settling :.2f} h)')
 
     # Anotações para tempo de subida (MODIFICADO FINAL)
-    if t_10 is not None and t_90 is not None:
+    # if t_10 is not None and t_90 is not None:
+    if t_rise is not None:
         # Adiciona o label a uma das linhas para aparecer na legenda
-        label_tr = f'Tempo de Subida (Tr = {t_rise*1000:.2f} ms)'
-        plt.axvline(t_10 * 1000, color='orange', linestyle='--', label=label_tr)
-        plt.axvline(t_90 * 1000, color='orange', linestyle='--')
+        label_tr = f'Tempo de Subida (Tr = {t_rise :.2f} h)'
+        plt.axvline(t_10  , color='orange', linestyle='--', label=label_tr)
+        plt.axvline(t_90  , color='orange', linestyle='--')
 
 
     # Configurações do gráfico
     # plt.title(r'Resposta com uma pequena pertubação', fontsize=16)
-    plt.xlabel('Tempo (ms)', fontsize=12)
+    plt.xlabel('Tempo (h)', fontsize=12)
     if label.startswith("G_X"):
         plt.ylabel('Concentração de Biomassa (g/L)', fontsize=12)
     elif label.startswith("G_S"):
@@ -146,7 +169,7 @@ numerador = G_X_D["num"]
 denominador = G_X_D["den"]
 G = TransferFunction(numerador, denominador)
 
-t, u = gerar_entrada(tipo="degrau_pos_neg", A=0.1 * 0.35, t_troca=20)
+t, u = gerar_entrada(tipo="degrau_pos_neg", A=0.1 * 0.35, t_troca=8)
 params(TransferFunction(G_X_D["num"], G_X_D["den"]), label="G_X_D", t=t, u=u)
 
 t, u = gerar_entrada(tipo="degrau", A=0.1 * 0.35)
