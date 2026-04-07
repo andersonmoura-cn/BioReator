@@ -10,17 +10,39 @@ from utils.saveFig import img_save
 # numerador = [K, -K * 180e3]
 # denominador = [1, 3125, 2.25e8]
 
+def gerar_entrada(tipo="degrau", A=1.0, t_final=50, n=1000, t_troca=20):
+    t = np.linspace(0, t_final, n)
 
-def params(G:TransferFunction, label, A):
-    # Cálculo da resposta ao degrau unitário
-    t = np.linspace(0, 50, 1000)
-    # Degrau de amplitude pequena como entrada
-    # A = -0.1*0.35
-    # u = [A if tempo<=20 else -A for tempo in t] # degrau de amplitude A
-    u = np.ones_like(t) * A 
+    if tipo == "degrau":
+        u = np.ones_like(t) * A
+
+    elif tipo == "degrau_pos_neg":
+        u = np.array([A if tempo <= t_troca else -A for tempo in t])
+
+    elif tipo == "degrau_neg_pos":
+        u = np.array([-A if tempo <= t_troca else A for tempo in t])
+
+    else:
+        raise ValueError(f"Tipo de entrada inválido: {tipo}")
+
+    return t, u
+
+def params(G: TransferFunction, label, t, u):
 
     # Simulação  com lsim
-    t, y, _ = lsim(G, U=u, T=t)
+    t, y_delta, _ = lsim(G, U=u, T=t)
+
+    # Pontos de operação
+    x_op = 0.3066   # g/L
+    s_op = 0.2333   # g/L
+
+    # Converte da variação para valor físico
+    if label.startswith("G_X"):
+        y = y_delta + x_op
+    elif label.startswith("G_S"):
+        y = y_delta + s_op
+    else:
+        y = y_delta
 
     # --- Cálculo das métricas da resposta ---
 
@@ -99,17 +121,23 @@ def params(G:TransferFunction, label, A):
 
 
     # Configurações do gráfico
-    plt.title(r'Resposta com uma pequena pertubação', fontsize=16)
+    # plt.title(r'Resposta com uma pequena pertubação', fontsize=16)
     plt.xlabel('Tempo (ms)', fontsize=12)
-    plt.ylabel('Amplitude de Saída', fontsize=12)
+    if label.startswith("G_X"):
+        plt.ylabel('Concentração de Biomassa (g/L)', fontsize=12)
+    elif label.startswith("G_S"):
+        plt.ylabel('Concentração de Substrato (g/L)', fontsize=12)
+
     plt.grid(True, which='both', linestyle='--', linewidth=0.5)
     plt.legend(fontsize=10)
     plt.tight_layout()
-    # plt.ylim(-c_max * 1.1, c_max * 1.1)
-    plt.ylim(0, c_max * 1.1)
+
+    y_min = np.min(y)
+    y_max = np.max(y)
+    margem = 0.05 * (y_max - y_min if y_max != y_min else 1)
+    plt.ylim(y_min - margem, y_max + margem)
 
     # Mostra o gráfico na tela
-    # plt.show()
     img_save(f"{label}",dir_name="RespostaLinear")
 
 
@@ -117,11 +145,13 @@ def params(G:TransferFunction, label, A):
 numerador = G_X_D["num"]
 denominador = G_X_D["den"]
 G = TransferFunction(numerador, denominador)
-# params(TransferFunction(G_X_D["num"], G_X_D["den"]), label="G_X_D", A = 0.1*0.35)
-params(TransferFunction(G_X_Sf["num"], G_X_Sf["den"]), label="G_X_Sf", A = 0.1*0.35)
-params(TransferFunction(G_S_D["num"], G_S_D["den"]), label="G_S_D", A = 0.1*1)
-params(TransferFunction(G_S_Sf["num"], G_S_Sf["den"]), label="G_S_Sf", A = 0.1*1)
 
-# print("num =", G.num[-1])
-# print("den =", G.den[-1])
-# print("ganho DC =", G.num[-1] / G.den[-1])
+t, u = gerar_entrada(tipo="degrau_pos_neg", A=0.1 * 0.35, t_troca=20)
+params(TransferFunction(G_X_D["num"], G_X_D["den"]), label="G_X_D", t=t, u=u)
+
+t, u = gerar_entrada(tipo="degrau", A=0.1 * 0.35)
+params(TransferFunction(G_X_Sf["num"], G_X_Sf["den"]), label="G_X_Sf", t=t, u=u)
+
+t, u = gerar_entrada(tipo="degrau", A=0.1 * 1)
+params(TransferFunction(G_S_D["num"], G_S_D["den"]), label="G_S_D", t=t, u=u)
+params(TransferFunction(G_S_Sf["num"], G_S_Sf["den"]), label="G_S_Sf", t=t, u=u)

@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 from pathlib import Path
 
 
-def img_save(file_name, dir_name, dpi = 300, show: bool = True):
+def img_save(file_name, dir_name, dpi = 300, show: bool = False):
     folder = imgs / dir_name
     folder.mkdir(parents=True, exist_ok=True)
 
