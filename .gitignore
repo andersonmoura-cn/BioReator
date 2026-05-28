@@ -9,3 +9,12 @@ __pycache__/
 
 # VSCode (opcional)
 .vscode/
+
+#diagramas
+diagramas/
+src/utils/apresentarDiagrama.py
+
+#doc
+doc/
+
+

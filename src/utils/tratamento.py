@@ -1,5 +1,6 @@
 import sympy as sp
 
+# Apenas para tratamento de visualização
 def clean(expr, tol=1e-10, ndigits=5):
     # zera termos muito pequenos
     expr = expr.xreplace({
@@ -29,3 +30,21 @@ def clean(expr, tol=1e-10, ndigits=5):
     )
 
     return sp.simplify(expr)
+
+
+# alterar forma tf para array
+def tf_to_num_den(expr, var):
+    num, den = sp.fraction(sp.simplify(expr))
+    
+    num_poly = sp.Poly(num, var)
+    den_poly = sp.Poly(den, var)
+    
+    num_coeffs = num_poly.all_coeffs()
+    den_coeffs = den_poly.all_coeffs()
+    
+    # converter para float (opcional)
+    num_coeffs = [float(c) for c in num_coeffs]
+    den_coeffs = [float(c) for c in den_coeffs]
+    
+    return num_coeffs, den_coeffs
+

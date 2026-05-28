@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 from scipy.signal import lti, step, TransferFunction, lsim
 
 from config.tf_config import G_X_D, G_S_D, G_S_Sf, G_X_Sf
-from utils.saveFig import img_save
+from utils.saves import img_save
 
 # Definição da função de transferência G(s)
 # K = -83333.333333333
@@ -102,7 +102,7 @@ def params(G: TransferFunction, label, t, u):
         t_settling = "Não foi possível calcular"
 
     # --- Impressão dos Resultados Precisos ---
-    print("Análise da Resposta ao Degrau (Valores Precisos):")
+    print(f"Análise da Resposta ao Degrau (Valores Precisos) de {label}:")
     print("-" * 50)
     print(f"Valor de Estado Estacionário (c_final): {c_final}")
     print(f"Valor de Pico (c_max): {c_max}")
@@ -122,7 +122,7 @@ def params(G: TransferFunction, label, t, u):
     # --- Geração do Gráfico ---
     plt.figure(figsize=(12, 7))
     # t_plot = t * 60  # horas -> minutos
-    plt.plot(t, y, label='Resposta ao Degrau', linewidth=2) # Eixo x em min
+    plt.plot(t, y, label=f'Resposta ao Degrau de {label}', linewidth=2) # Eixo x em min
 
     # Linhas de referência e anotações
     plt.axhline(c_final, color='red', linestyle='--', label=f'Valor Estacionário ({c_final:.3f})')
