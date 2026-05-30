@@ -4,7 +4,8 @@ from scipy.integrate import solve_ivp
 from scipy.signal import find_peaks
 import matplotlib.pyplot as plt
 
-
+# metricas
+from utils.metrics import metricsControl
 # parametros
 from config.config import values
 
@@ -69,7 +70,6 @@ def bioreactor_model(t, states, D, params):
 
     return [dXdt, dSdt]
 
-
 ########################################################################
 ## SIMULAÇÃO PID
 ########################################################################
@@ -123,10 +123,7 @@ def simular_PID(Kc, Ti, Td=0, Xsp=0.3066, D0=0.35, states=np.array([0.3066, 0.23
         error_history.append(error)
 
     # metricas
-    e = np.array(Xsp) - np.array(X_history)
-
-    IAE = np.trapezoid(np.abs(e), tempo)
-    ISE = np.trapezoid(e**2, tempo)
+    metrics = metricsControl(Xsp, X_history, tempo)
 
     if show:
         ####### X #######
@@ -149,10 +146,6 @@ def simular_PID(Kc, Ti, Td=0, Xsp=0.3066, D0=0.35, states=np.array([0.3066, 0.23
         plt.plot(tempo, error_history, label="error")
         # plt.axhline(Xsp, linestyle="--", label="Xsp")
         plt.ticklabel_format(axis='y', style='plain', useOffset=False)
-        # plt.ylim(
-        #     Xsp - 3e-5,
-        #     Xsp + 3e-5
-        # )
         plt.xlabel("Tempo (h)")
         plt.ylabel("Erro X (g/L)")
         plt.legend()
@@ -183,7 +176,7 @@ def simular_PID(Kc, Ti, Td=0, Xsp=0.3066, D0=0.35, states=np.array([0.3066, 0.23
         plt.grid()
         plt.show()
     
-    return tempo, X_history, S_history, D_history, IAE, ISE,error_history
+    return tempo, X_history, S_history, D_history, metrics['IAE'], metrics['ISE'], error_history
 
 
 ########################################################################
@@ -196,17 +189,22 @@ def simular_step_test(
     step_time=10,
     states=np.array([0.3066, 0.2333]),
     tempo_final=50,
-    dt=0.01
+    dt=0.01,
+    Xsp = 0.3066,
+    show=True
 ):
 
     X_history = []
     S_history = []
     D_history = []
+    error_history = []
 
     tempo = np.arange(0, tempo_final + dt, dt)
 
     for t in tempo:
-
+        X, S = states
+        error = Xsp - X
+        
         if t < step_time:
             D = D0
         else:
@@ -226,6 +224,42 @@ def simular_step_test(
         X_history.append(states[0])
         S_history.append(states[1])
         D_history.append(D)
+        error_history.append(error)
+
+    if show:
+        ####### X #######
+        plt.figure()
+        plt.plot(tempo, X_history, label="X")
+        plt.ticklabel_format(axis='y', style='plain', useOffset=False)
+        plt.xlabel("Tempo (h)")
+        plt.ylabel("Biomassa X (g/L)")
+        plt.legend()
+        plt.grid()
+        plt.show()
+
+        ####### Sf #######
+
+        plt.figure()
+        plt.plot(tempo, S_history, label="S")
+        plt.xlabel("Tempo (h)")
+        plt.ylabel("Substrato S (g/L)")
+        plt.legend()
+        plt.grid()
+        plt.show()
+
+        ####### D #######
+
+        plt.figure()
+        plt.plot(tempo, D_history, label="D")
+
+        # desativa a notação científica com offset
+        plt.ticklabel_format(axis='y', style='plain', useOffset=False)
+
+        plt.xlabel("Tempo (h)")
+        plt.ylabel("Taxa de diluição D (h⁻¹)")
+        plt.legend()
+        plt.grid()
+        plt.show()
 
     return tempo, X_history, S_history, D_history
 
@@ -323,3 +357,146 @@ def estimar_parametros_relay(t, X, d, tempo_descartar=20):
     Td = 0
 
     return a, Pu, Kcu, Kc, Ti, Td
+
+
+###################################
+## fuzzy
+##################################
+
+def simular_fuzzy(
+    sim,
+    D0=0.35,
+    D_min=0.22,
+    D_max=0.43,
+    states=np.array([0.3066, 0.2333]),
+    tempo_final=50,
+    dt=0.01,
+    Xsp=0.3066,
+    show=True
+):
+    X_history = []
+    S_history = []
+    D_history = []
+    error_history = []
+    de_history = []
+    deltaD_history = []
+
+    tempo = np.arange(0, tempo_final + dt, dt)
+
+    D = D0
+    e_ant = Xsp - states[0]
+
+    for t in tempo:
+        X, S = states
+
+        # erro atual
+        e = Xsp - X
+
+        # variação do erro
+        de = (e - e_ant)/dt
+
+        # evita sair do universo de discurso do fuzzy
+        e_fuzzy = np.clip(e, -0.05, 0.05)
+        de_fuzzy = np.clip(de, -0.02, 0.02)
+
+        # entrada crisp no controlador fuzzy
+        sim.input['erro'] = e_fuzzy
+        sim.input['delta_erro'] = de_fuzzy
+
+        # calcula saída fuzzy defuzzificada
+        sim.compute()
+
+        deltaD = sim.output['delta_D']
+
+        # atualiza D
+        D = D + deltaD
+
+        # saturação D
+        D = np.clip(D, D_min, D_max)
+
+        sol = solve_ivp(
+            fun=lambda tau, y: bioreactor_model(
+                tau, y, D, values
+            ),
+            t_span=(t, t + dt),
+            y0=states,
+            method="RK45"
+        )
+
+        states = sol.y[:, -1]
+
+        X_history.append(states[0])
+        S_history.append(states[1])
+        D_history.append(D)
+        error_history.append(e)
+        de_history.append(de)
+        deltaD_history.append(deltaD)
+
+        e_ant = e
+
+    # metricas
+    metrics = metricsControl(Xsp, X_history, tempo)
+
+    if show:
+        ####### X #######
+        plt.figure()
+        plt.plot(tempo, X_history, label="X")
+        plt.axhline(Xsp, linestyle="--", label="Xsp")
+        plt.ticklabel_format(axis='y', style='plain', useOffset=False)
+        plt.xlabel("Tempo (h)")
+        plt.ylabel("Biomassa X (g/L)")
+        plt.legend()
+        plt.grid()
+        plt.show()
+
+        ####### S #######
+        plt.figure()
+        plt.plot(tempo, S_history, label="S")
+        plt.xlabel("Tempo (h)")
+        plt.ylabel("Substrato S (g/L)")
+        plt.legend()
+        plt.grid()
+        plt.show()
+
+        ####### D #######
+        plt.figure()
+        plt.plot(tempo, D_history, label="D")
+        plt.axhline(D_min, linestyle="--", label="D_min")
+        plt.axhline(D_max, linestyle="--", label="D_max")
+        plt.ticklabel_format(axis='y', style='plain', useOffset=False)
+        plt.xlabel("Tempo (h)")
+        plt.ylabel("Taxa de diluição D (h⁻¹)")
+        plt.legend()
+        plt.grid()
+        plt.show()
+
+        ####### erro #######
+        plt.figure()
+        plt.plot(tempo, error_history, label="erro")
+        plt.axhline(0, linestyle="--")
+        plt.xlabel("Tempo (h)")
+        plt.ylabel("Erro e = Xsp - X")
+        plt.legend()
+        plt.grid()
+        plt.show()
+
+        ####### delta D #######
+        plt.figure()
+        plt.plot(tempo, deltaD_history, label="ΔD")
+        plt.axhline(0, linestyle="--")
+        plt.xlabel("Tempo (h)")
+        plt.ylabel("Correção fuzzy ΔD")
+        plt.legend()
+        plt.grid()
+        plt.show()
+
+    return (
+        tempo,
+        X_history,
+        S_history,
+        D_history,
+        error_history,
+        de_history,
+        deltaD_history,
+        metrics
+    )

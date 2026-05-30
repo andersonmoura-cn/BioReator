@@ -6,6 +6,7 @@ def trunc(x, casas=5):
     fator = 10**casas
     return math.trunc(x * fator) / fator
 
+# simulação linearização
 def metrics(noLinear, absol, tempo, label:str):
     # erro abs:
     erro_abs = np.abs(noLinear - absol)
@@ -37,4 +38,23 @@ def metrics(noLinear, absol, tempo, label:str):
     print(f"Erro máximo em {label}: {trunc(erro_max, 5)}")
     print(f"Validade em {label} até: {math.ceil(t_valido)} h")
     print(f"RMSE {label}: {rmse:.3f}") 
-    
+
+# simulação controle
+def metricsControl(Xsp, X_history, tempo):
+    X = np.array(X_history)
+    tempo = np.array(tempo)
+
+    overshoot = np.max(X) - Xsp
+    undershoot = Xsp - np.min(X)
+
+    # metricas
+    e = np.array(Xsp) - np.array(X)
+
+    IAE = np.trapezoid(np.abs(e), tempo)
+    ISE = np.trapezoid(e**2, tempo)
+
+    return {
+        "IAE": IAE, 
+        "ISE": ISE,
+        "overshoot":overshoot,
+        "undershoot":undershoot}
