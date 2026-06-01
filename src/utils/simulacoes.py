@@ -9,6 +9,8 @@ from utils.metrics import metricsControl
 # parametros
 from config.config import values
 
+from utils.geneticos_auxiliares import mutacao, cruzamento, ordenar_populacao
+
 ########################################################################
 ## PID
 ########################################################################
@@ -530,6 +532,8 @@ def simular_fuzzy(
 ## Continuous Cycling 
 ##################################
 def simular_CC(
+    Kcu= -0.5,
+    passo= 0.1,
     Xsp=0.3066,
     D0=0.35,
     states=np.array([0.3066, 0.2333]),
@@ -540,15 +544,16 @@ def simular_CC(
     iter_max=100
 ):
 
-    tempo = np.arange(0, tempo_final + dt, dt)
-
-    # Pequena mudança no setpoint de 5%
-    Xsp_novo = Xsp * 1.05
+    # Pequena mudança no setpoint de 3%
+    Xsp_novo = Xsp * 1.03
     
-    Kcu = -0.5
+    Pu = 0
     
     while iter_max > 0:
-        t, X, S, D, _, _, erro = simular_PID(Kc=Kcu, Ti=np.inf, Xsp=Xsp_novo, D0=D0, states=states, tempo_final=tempo_final)
+        t, X, S, D, _, _, erro = simular_PID(Kc=Kcu, Ti=np.inf, Xsp=Xsp_novo, D0=D0, states=states, tempo_final=tempo_final, show= False)
+        
+        t = np.array(t)
+        X = np.array(X)
          
         # detecta os picos da resposta
         indices_picos, _ = find_peaks(X)
@@ -588,7 +593,7 @@ def simular_CC(
                 print(f"Pu = {Pu:.4f}")
                 break
         
-        Kcu -= 0.1
+        Kcu -= passo
         iter_max -= 1
 
     return t, X, S, D, erro, Kcu, Pu
@@ -617,3 +622,74 @@ def estimar_parametros_CC(Kcu, Pu, controlador: str = "PI"):
         print("Controlador indisponível. Possíveis: P, PI e PID")
         
         return -1
+    
+def selecao(erro_individuo_lim, Xsp, D0, states, gen, tf, dt, pert, t_pert, Sf_pert):
+    erro_min = np.inf
+    fortes = []
+    fracos = []
+    erros_fortes = []
+    erros_fracos = []
+
+    for individuo in gen:
+        erro_individuo = np.inf
+        # só pode ser selecionado como forte se Ti != 0
+        if individuo[1] != 0:
+            t1, X1, S1, D1, IAE, ISE, erro = simular_PID(Kc=individuo[0], Ti=individuo[1], Xsp=Xsp, D0=D0, states=states, tempo_final=tf, dt=dt, show=False, pert=pert, t_pert=t_pert, Sf_pert=Sf_pert)
+            erro_individuo = IAE
+
+        if erro_individuo <= erro_individuo_lim: 
+            fortes.append(individuo)
+            erros_fortes.append(erro_individuo)
+        else:
+            fracos.append(individuo)
+            erros_fracos.append(erro_individuo)
+        
+        # menor erro dentro dessa geracao
+        if np.abs(erro_min) > np.abs(erro_individuo):
+            erro_min = erro_individuo
+                
+    return fortes, fracos, erros_fortes, erros_fracos, erro_min
+
+def simular_genetico(iter_max, erro_desejado,erro_individuo_lim, D0, states, gen, Xsp, tf, dt, pert=False, t_pert: int = None, Sf_pert: int = None, flag_fracos: bool = True):
+    df = None
+    historico_erro = []
+    while iter_max > 0:
+        # seleção da geração
+        fortes, fracos, erros_fortes, erros_fracos, erro_min = selecao(erro_individuo_lim= erro_individuo_lim, Xsp=Xsp, D0=D0, states=states, gen= gen, tf=tf, dt=dt, pert=pert, t_pert=t_pert, Sf_pert= Sf_pert)
+             
+        # salva erro minimo de cada geração
+        historico_erro.append(erro_min)
+        
+        dict_populacao = {
+                "candidatos": fortes,
+                "erros": erros_fortes
+            }
+        
+        # o menor custo da geração foi top, para aqui
+        if abs(erro_min) < erro_desejado:
+            print("ola")
+            break
+        
+        if iter_max > 1:
+            filhos = np.empty((0, 2))
+            if len(fortes) >= 2:
+                filhos = cruzamento(np.array(fortes))
+                filhos = mutacao(filhos) 
+
+            # nova geracao
+            gen = np.concatenate([mutacao(np.array(fracos)), filhos]) if len(fracos) > 0 else filhos
+
+        if iter_max == 1 and len(fortes) == 0:
+            # Se na ultima geração só houver fracos, o escolhido será o melhor entre eles
+            dict_populacao = {
+                "candidatos": fracos,
+                "erros": erros_fracos
+            }
+            
+        iter_max-=1
+        
+    povo = ordenar_populacao(dict_populacao)
+    Kp = povo["candidatos"][0][0]
+    Ti = povo["candidatos"][0][1]
+    
+    return Kp, Ti, historico_erro
