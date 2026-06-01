@@ -75,14 +75,13 @@ def bioreactor_model(t, states, D, params):
 ########################################################################
 
 def simular_PID(Kc, Ti, Td=0, Xsp=0.3066, D0=0.35, states=np.array([0.3066, 0.2333]), pert=False, t_pert: int = None, Sf_pert: int = None, tempo_final=100, dt=0.01, u_min=0, u_max=1, show: bool = True):
-    X_history = []
-    S_history = []
-    D_history = []
+    X_history = [states[0]]
+    S_history = [states[1]]
+    D_history = [D0]
     error_history = []
     values["Sf"] = 1.0 # recuperar estado.... talvez nem der mais problmea
 
-    tempo = np.arange(0, tempo_final + dt, dt)
-
+    tempo = np.arange(dt, tempo_final + dt, dt)
     pid = PID(
         Kp=Kc,
         Ki=Kc/Ti,
@@ -122,6 +121,9 @@ def simular_PID(Kc, Ti, Td=0, Xsp=0.3066, D0=0.35, states=np.array([0.3066, 0.23
         D_history.append(D)
         error_history.append(error)
 
+    tempo = np.concatenate(([0], tempo))
+    error_history.append(Xsp - states[0])
+    
     # metricas
     metrics = metricsControl(Xsp, X_history, tempo)
 
@@ -363,6 +365,7 @@ def estimar_parametros_relay(t, X, d, tempo_descartar=20):
 ## fuzzy
 ##################################
 
+
 def simular_fuzzy(
     sim,
     D0=0.35,
@@ -372,6 +375,7 @@ def simular_fuzzy(
     tempo_final=50,
     dt=0.01,
     Xsp=0.3066,
+    pert=False, t_pert: int = None, Sf_pert: int = None,
     show=True
 ):
     X_history = []
@@ -380,6 +384,8 @@ def simular_fuzzy(
     error_history = []
     de_history = []
     deltaD_history = []
+    values["Sf"] = 1.0 # recuperar estado.... talvez nem der mais problmea
+
 
     tempo = np.arange(0, tempo_final + dt, dt)
 
@@ -413,6 +419,15 @@ def simular_fuzzy(
 
         # saturação D
         D = np.clip(D, D_min, D_max)
+
+        # pertubação
+        if pert is True and t_pert is None:
+            print("defina tempo em que a pertubação ocorre, pertubado")
+            return
+        elif pert is True and t > t_pert:
+            values["Sf"] = Sf_pert
+            pass
+
 
         sol = solve_ivp(
             fun=lambda tau, y: bioreactor_model(
@@ -476,6 +491,16 @@ def simular_fuzzy(
         plt.axhline(0, linestyle="--")
         plt.xlabel("Tempo (h)")
         plt.ylabel("Erro e = Xsp - X")
+        plt.legend()
+        plt.grid()
+        plt.show()
+
+        ####### delta erro #######
+        plt.figure()
+        plt.plot(tempo, de_history, label="erro")
+        plt.axhline(0, linestyle="--")
+        plt.xlabel("Tempo (h)")
+        plt.ylabel(r"$\Delta$ Erro")
         plt.legend()
         plt.grid()
         plt.show()
