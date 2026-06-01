@@ -500,3 +500,95 @@ def simular_fuzzy(
         deltaD_history,
         metrics
     )
+    
+###################################
+## Continuous Cycling 
+##################################
+def simular_CC(
+    Xsp=0.3066,
+    D0=0.35,
+    states=np.array([0.3066, 0.2333]),
+    tempo_final=100,
+    dt=0.01,
+    u_min=0,
+    u_max=1,
+    iter_max=100
+):
+
+    tempo = np.arange(0, tempo_final + dt, dt)
+
+    # Pequena mudança no setpoint de 5%
+    Xsp_novo = Xsp * 1.05
+    
+    Kcu = -0.5
+    
+    while iter_max > 0:
+        t, X, S, D, _, _, erro = simular_PID(Kc=Kcu, Ti=np.inf, Xsp=Xsp_novo, D0=D0, states=states, tempo_final=tempo_final)
+         
+        # detecta os picos da resposta
+        indices_picos, _ = find_peaks(X)
+         
+        tempos_picos = t[indices_picos]
+        valores_picos = X[indices_picos]
+
+        amplitudes = np.abs(valores_picos - Xsp_novo)
+
+        n_picos = 5
+        
+        if len(amplitudes) >= n_picos:
+
+            ultimas_amplitudes = amplitudes[-n_picos:]
+
+            amp_max = np.max(ultimas_amplitudes)
+            amp_min = np.min(ultimas_amplitudes)
+
+            variacao_relativa = (amp_max - amp_min) / amp_max
+
+            print("Últimas amplitudes:", ultimas_amplitudes)
+            print(f"Variação relativa: {variacao_relativa:.4f}")
+
+            # Critério de oscilação sustentada
+            tolerancia = 0.05  # 5%
+
+            if variacao_relativa < tolerancia:
+                print("Oscilação sustentada detectada.")
+
+                # Calcula Pu usando os últimos picos
+                ultimos_tempos = tempos_picos[-n_picos:]
+
+                periodos = np.diff(ultimos_tempos)
+
+                Pu = np.mean(periodos)
+
+                print(f"Pu = {Pu:.4f}")
+                break
+        
+        Kcu -= 0.1
+        iter_max -= 1
+
+    return t, X, S, D, erro, Kcu, Pu
+
+def estimar_parametros_CC(Kcu, Pu, controlador: str = "PI"):
+    
+    if controlador == "P":
+        Kc = 0.5 * Kcu
+        
+        return Kc
+    
+    elif controlador == "PI":
+        Kc = 0.45 * Kcu
+        Ti = Pu / 1.2
+        
+        return Kc, Ti
+    
+    elif controlador == "PID":
+        Kc = 0.6 * Kcu
+        Ti = Pu / 2
+        Td = Pu / 8
+        
+        return Kc, Ti, Td
+    
+    else:
+        print("Controlador indisponível. Possíveis: P, PI e PID")
+        
+        return -1
