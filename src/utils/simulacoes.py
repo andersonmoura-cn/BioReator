@@ -675,9 +675,11 @@ def simular_genetico(iter_max, erro_desejado,erro_individuo_lim, D0, states, gen
             if len(fortes) >= 2:
                 filhos = cruzamento(np.array(fortes))
                 filhos = mutacao(filhos) 
+            elif len(fortes) == 1:
+                filhos = fortes
 
             # nova geracao
-            gen = np.concatenate([mutacao(np.array(fracos)), filhos]) if len(fracos) > 0 else filhos
+            gen = np.concatenate([mutacao(np.array(fracos), individuo= "Fraco"), filhos]) if len(fracos) > 0 else filhos
 
         if iter_max == 1 and len(fortes) == 0:
             # Se na ultima geração só houver fracos, o escolhido será o melhor entre eles

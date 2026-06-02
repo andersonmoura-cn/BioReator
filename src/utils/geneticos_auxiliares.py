@@ -129,7 +129,9 @@ def mutacao_gene(cromossomo, pm):
     
     return cromossomo
     
-def mutacao(populacao, pm: float = 0.1):
+def mutacao(populacao, pm: float = 0.1, individuo: str = "Forte"):
+    if individuo == "Fraco": pm = 0.3
+    
     for i in range(len(populacao)):
         Kp = populacao[i, 0]
         Ti = populacao[i, 1]
