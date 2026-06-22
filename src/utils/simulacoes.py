@@ -84,9 +84,14 @@ def simular_PID(Kc, Ti, Td=0, Xsp=0.3066, D0=0.35, states=np.array([0.3066, 0.23
     values["Sf"] = 1.0 # recuperar estado.... talvez nem der mais problmea
 
     tempo = np.arange(dt, tempo_final + dt, dt)
+
+    Ki = 0
+    if Ti != 0:
+        Ki = Kc/Ti
+    
     pid = PID(
         Kp=Kc,
-        Ki=Kc/Ti,
+        Ki=Ki,
         Kd=Kc*Td,
         u0=D0,
         u_min=u_min,
