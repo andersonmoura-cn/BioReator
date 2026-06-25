@@ -15,11 +15,17 @@ def bloco(m: int , r: int , P: int , N: int , Ts: int = 0.1):
             u = np.zeros((r, 1))
             u[entrada, 0] = 1.0  # degrau unitário nessa entrada
 
-            for k in range(i):
-                y = Cd @ x + Dd @ u
-                x = Ad @ x + Bd @ u
+            # for k in range(i): -> ERRADO DOIDO -> cal. saida antes de atualizar a entrada??
+            #  A primeira s1 vem zzerada porque não houve o degrau MDSSWS
+            #     y = Cd @ x + Dd @ u
+            #     x = Ad @ x + Bd @ u
 
-            Si[:, entrada] = y.flatten()
+            # Si[:, entrada] = y.flatten()
+            for _ in range(i):
+                x = Ad @ x + Bd @ u
+            
+            y = Cd @ x + Dd @ u
+            Si[:, entrada] = y.ravel()
 
         S_blocks.append(Si)
 
@@ -38,7 +44,7 @@ def discretizando(matrizes: np.ndarray, Ts: int ):
     
     D = matrizes["D"]
 
-    if D == 0: D = np.zeros((2, 2))   # KKKKK SIM, EU SEI QUE É KKKKK
+    if D == 0: D = np.zeros((2, 2))   # obs: somente para meu problema hoje porque tem um save errado
 
     Ad, Bd, Cd, Dd, _ = cont2discrete((A, B, C, D), Ts)
 
