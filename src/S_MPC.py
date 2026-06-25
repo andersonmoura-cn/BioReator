@@ -2,10 +2,10 @@ import numpy as np
 from scipy.signal import cont2discrete
 from config.matrizes_config import matrizes
 
-def bloquinhos(m: int , r: int , P: int , N: int , Ts: int = 0.1):
+def bloco(m: int , r: int , P: int , N: int , Ts: int = 0.1):
     # print(m, r)
     S_blocks = []
-    Ad, Bd, Cd, Dd = olhar_discreto(matrizes, Ts)
+    Ad, Bd, Cd, Dd = discretizando(matrizes, Ts)
 
     for i in range(1, N + 1):
         Si = np.zeros((m, r))
@@ -29,7 +29,7 @@ def bloquinhos(m: int , r: int , P: int , N: int , Ts: int = 0.1):
     return S_blocks
 
 
-def olhar_discreto(matrizes: np.ndarray, Ts: int ):
+def discretizando(matrizes: np.ndarray, Ts: int ):
     A = matrizes["A"]
 
     B = matrizes["B"]
@@ -46,9 +46,9 @@ def olhar_discreto(matrizes: np.ndarray, Ts: int ):
 
 
 
-def carnaval(m: int , r: int , M: int , P: int , N: int , Ts: int ):
+def matriz_S(m: int , r: int , M: int , P: int , N: int , Ts: int ):
     Sdyn = np.zeros((m * P, r * M))
-    S_blocks = bloquinhos(m, r, P, N, Ts)
+    S_blocks = bloco(m, r, P, N, Ts)
 
     for linha in range(P):
         for coluna in range(M):
