@@ -628,6 +628,10 @@ def estimar_parametros_CC(Kcu, Pu, controlador: str = "PI"):
         
         return -1
     
+#-----------------------------------------
+#----------- algoritmo genetico-----------
+#-----------------------------------------
+
 def selecao(erro_individuo_lim, Xsp, D0, states, gen, tf, dt, pert, t_pert, Sf_pert):
     erro_min = np.inf
     fortes = []
